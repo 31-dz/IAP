@@ -94,5 +94,9 @@ def generate_flare_data(start_year=2022, end_year=2025):
 
 if __name__ == "__main__":
     flare_df = generate_flare_data(2022, 2025)
-    flare_df.to_csv('lng_flare_data.csv', index=False)
-    print("✓ Data successfully saved to 'lng_flare_data.csv'")
+    
+    file_name = input("Enter name for the output file (press Enter for default 'lng_flare_data.csv'): ").strip().strip("'\"")
+    output_file = file_name if file_name else 'lng_flare_data.csv'
+    
+    flare_df.to_csv(output_file, index=False)
+    print(f"✓ Data successfully saved to '{output_file}'")
