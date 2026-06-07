@@ -3,10 +3,17 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
 
+# Set cohesive publication-quality aesthetics
 sns.set_style("whitegrid")
 plt.rcParams.update({'font.size': 10, 'axes.labelsize': 11, 'axes.titlesize': 12})
 
-df = pd.read_csv('lng_flare_data.csv')
+# Prompt user for the dataset path while providing a standard fallback default
+input_filename = input("Please enter the path to the LNG flare data CSV file (default: lng_flare_data.csv): ").strip()
+if not input_filename:
+    input_filename = 'lng_flare_data.csv'
+
+# Load flaring metrics and parse historical timestamps
+df = pd.read_csv(input_filename)
 df['timestamp'] = pd.to_datetime(df['timestamp'])
 
 # 1. Time Series Overview
@@ -17,6 +24,7 @@ plt.xlabel('Date')
 plt.ylabel('Flare Rate (m³/hr)')
 plt.tight_layout()
 plt.savefig('plot1_full_year_overview.png', dpi=150)
+plt.show()
 plt.close()
 
 # 2. Daily Average
@@ -28,6 +36,7 @@ plt.xlabel('Date')
 plt.ylabel('Avg Flare Rate (m³/hr)')
 plt.tight_layout()
 plt.savefig('plot2_daily_average.png', dpi=150)
+plt.show()
 plt.close()
 
 # 3. Hourly Profile
@@ -40,6 +49,7 @@ plt.ylabel('Avg Rate (m³/hr)')
 plt.xticks(range(0, 24, 2))
 plt.tight_layout()
 plt.savefig('plot3_hourly_pattern.png', dpi=150)
+plt.show()
 plt.close()
 
 # 4. Monthly Volumetric Sums
@@ -53,13 +63,16 @@ plt.ylabel('Total Gas Volume (1,000 m³)')
 plt.xticks(range(1, 13), ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'])
 plt.tight_layout()
 plt.savefig('plot4_monthly_totals.png', dpi=150)
+plt.show()
 plt.close()
 
 # 5. Volumetric Share by Cause
 plt.figure(figsize=(11, 5))
-cause_cols = ['normal_operations_m3_per_hour', 'process_upset_m3_per_hour', 'equipment_maintenance_m3_per_hour',
-              'startup_shutdown_m3_per_hour', 'emergency_relief_m3_per_hour', 'compressor_trip_m3_per_hour',
-              'instrument_failure_m3_per_hour']
+cause_cols = [
+    'normal_operations_m3_per_hour', 'process_upset_m3_per_hour', 'equipment_maintenance_m3_per_hour',
+    'startup_shutdown_m3_per_hour', 'emergency_relief_m3_per_hour', 'compressor_trip_m3_per_hour',
+    'instrument_failure_m3_per_hour'
+]
 cause_totals = {c.replace('_m3_per_hour', '').replace('_', ' ').title(): df[c].sum() / 1000 for c in cause_cols}
 cause_series = pd.Series(cause_totals).sort_values(ascending=True)
 plt.barh(range(len(cause_series)), cause_series.values, color='#9b59b6', edgecolor='black')
@@ -68,19 +81,21 @@ plt.title('Total Historical Flare Gas Volume by Cause', fontweight='bold')
 plt.xlabel('Total Flare Gas (1,000 m³)')
 plt.tight_layout()
 plt.savefig('plot5_flare_by_cause.png', dpi=150)
+plt.show()
 plt.close()
 
 # 6. Stacked Area Contribution Profile
 plt.figure(figsize=(15, 5))
 daily_stacked = df.set_index('timestamp')[cause_cols].resample('D').sum()
 plt.stackplot(daily_stacked.index, [daily_stacked[c] for c in cause_cols], 
-              labels=[c.replace('_m3_per_hour','').replace('_',' ').title() for c in cause_cols], alpha=0.85)
+              labels=[c.replace('_m3_per_hour', '').replace('_', ' ').title() for c in cause_cols], alpha=0.85)
 plt.title('Daily Flare Gas Contribution Profiles', fontweight='bold')
 plt.xlabel('Date')
 plt.ylabel('Daily Total Flare Gas (m³)')
 plt.legend(loc='upper left', fontsize=9)
 plt.tight_layout()
 plt.savefig('plot6_stacked_causes.png', dpi=150)
+plt.show()
 plt.close()
 
 # 7. Severity Distribution
@@ -92,6 +107,7 @@ plt.xlabel('Severity')
 plt.ylabel('Operating Hours')
 plt.tight_layout()
 plt.savefig('plot7_severity_distribution.png', dpi=150)
+plt.show()
 plt.close()
 
 # 8. KDE Distribution Normal Operations
@@ -105,6 +121,7 @@ plt.ylabel('Density')
 plt.legend()
 plt.tight_layout()
 plt.savefig('plot8_normal_ops_distribution.png', dpi=150)
+plt.show()
 plt.close()
 
 # 9. Isolated Normal Operations Daily Tracking
@@ -118,9 +135,10 @@ plt.xlabel('Timeline')
 plt.ylabel('Gas Flare Volumetric Rate (m³/hr)')
 plt.tight_layout()
 plt.savefig('plot9_normal_ops_only.png', dpi=150)
+plt.show()
 plt.close()
 
-# 10. Integrated Weekly Timeline
+# 10. Integrated Weekly Timeline vs Predictive Layer
 try:
     forecast_df = pd.read_csv('normal_ops_forecast_2026.csv')
     forecast_df['date'] = pd.to_datetime(forecast_df['date'])
@@ -137,10 +155,12 @@ try:
     plt.plot(forecast_df['date'], forecast_df['forecasted_normal_ops_m3_per_hour'], 
              color='#e67e22', linewidth=2.5, marker='s', markersize=4, label='Weekly SARIMA Forecast (2026)')
     
+    # Highlight seasonal thermal peak bands
     plt.axvspan(pd.Timestamp('2024-06-15'), pd.Timestamp('2024-07-31'), color='#e74c3c', alpha=0.2)
     plt.axvspan(pd.Timestamp('2025-06-15'), pd.Timestamp('2025-07-31'), color='#e74c3c', alpha=0.2)
     plt.axvspan(pd.Timestamp('2026-06-15'), pd.Timestamp('2026-07-31'), color='#e74c3c', alpha=0.2, label='Summer Thermal Peak Spans')
     
+    # Highlight seasonal winter operation troughs
     plt.axvspan(pd.Timestamp('2024-01-01'), pd.Timestamp('2024-02-15'), color='#3498db', alpha=0.2)
     plt.axvspan(pd.Timestamp('2025-01-01'), pd.Timestamp('2025-02-15'), color='#3498db', alpha=0.2)
     plt.axvspan(pd.Timestamp('2026-01-01'), pd.Timestamp('2026-02-15'), color='#3498db', alpha=0.2, label='Winter Operational Troughs')
@@ -153,6 +173,7 @@ try:
     plt.tight_layout(rect=[0, 0.05, 1, 1])
     
     plt.savefig('plot10_integrated_sarima_forecast.png', dpi=300, bbox_inches='tight')
-    print("✓ All 10 plots built and exported successfully.")
+    plt.show()
+    print("✓ All 10 plots exported and displayed successfully.")
 except FileNotFoundError:
     print("⚠️ Missing normal_ops_forecast_2026.csv. Run analysis.py first.")
