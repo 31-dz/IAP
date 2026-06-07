@@ -3,6 +3,8 @@ import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
 import pandas as pd
 import plotly.graph_objects as go
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 
 def parse_flexible_date(date_str):
     if not date_str:
@@ -134,7 +136,7 @@ def generate_visualizations(df, orig_start, orig_finish, opt_start, opt_finish, 
     fig.add_trace(go.Scatter(x=df["Date"], y=df["Flaring_Rate"], mode="lines+markers", name="Forecasted Rate", line=dict(color="#2c3e50")))
     fig.add_trace(go.Scatter(x=[None], y=[None], mode="markers", name=f"Planned Schedule ({orig_start.strftime('%b %d')})", marker=dict(symbol="square", size=14, color="rgba(128, 128, 128, 0.4)", line=dict(color="grey", width=1))))
     fig.add_trace(go.Scatter(x=[None], y=[None], mode="markers", name=f"Optimal Window ({opt_start.strftime('%b %d')})", marker=dict(symbol="square", size=14, color="rgba(46, 204, 113, 0.4)", line=dict(color="green", width=1))))
-    fig.add_trace(go.Scatter(x=[None], y=[None], mode="markers", name="Interactive Selection", marker=dict(symbol="square", size=14, color="rgba(41, 128, 185, 0.4)", line=dict(color="#2980b9", width=2, dash="dash"))))
+    fig.add_trace(go.Scatter(x=[None], y=[None], mode="markers", name="Interactive Selection", marker=dict(symbol="square", size=14, color="rgba(41, 128, 185, 0.4)", line=dict(color="#2980b9", width=2))))
 
     fig.update_layout(
         title="Interactive Turnaround Optimization Explorer", xaxis_title="Timeline Date Axis", yaxis_title="Normal Flaring Rate (m³/hour)",
@@ -150,6 +152,43 @@ def generate_visualizations(df, orig_start, orig_finish, opt_start, opt_finish, 
     fig.layout.annotations = list(fig.layout.annotations) + [dict(text=f"Planned Window Volume: {planned_vol:,.2f} m³  |  Optimal Window Volume: {optimal_vol:,.2f} m³  |  Interactive Selection Volume: {df.loc[slider_active_idx + window_rows - 1, 'Rolling_Volume']:,.2f} m³", xref="paper", yref="paper", x=0.5, y=1.08, showarrow=False, font=dict(size=13, color="#2c3e50", family="Arial-Bold"))]
     fig.write_html("shutdown_window_slider.html")
 
+    # --- MATPLOTLIB VISUALIZATION ---
+    start_dates = df["Date"].iloc[:len(df) - window_rows + 1]
+    volumes = df["Rolling_Volume"].iloc[window_rows - 1:]
+    
+    fig_mp, ax_mp = plt.subplots(figsize=(11, 6))
+    ax_mp.plot(start_dates, volumes, color="#2c3e50", linewidth=2, label="Total Flaring Volume")
+    ax_mp.scatter(opt_start, optimal_vol, color="#e74c3c", s=120, zorder=5, label=f"Optimal Start ({opt_start.strftime('%Y-%m-%d')})")
+    
+    # Axis projection lines extending clean to plot edges
+    ax_mp.axhline(y=optimal_vol, xmin=0, xmax=(mdates.date2num(opt_start) - ax_mp.get_xlim()[0]) / (ax_mp.get_xlim()[1] - ax_mp.get_xlim()[0]), color="#e74c3c", linestyle=":", linewidth=1.5, zorder=3)
+    ax_mp.axvline(x=opt_start, ymin=0, ymax=(optimal_vol - ax_mp.get_ylim()[0]) / (ax_mp.get_ylim()[1] - ax_mp.get_ylim()[0]), color="#e74c3c", linestyle=":", linewidth=1.5, zorder=3)
+    
+    # Combined annotation directly pointing to the peak marker
+    ax_mp.annotate(
+        f"Peak: {optimal_vol:,.2f} $m^3$\nDate: {opt_start.strftime('%Y-%m-%d')}",
+        xy=(opt_start, optimal_vol),
+        xytext=(opt_start, optimal_vol * 0.85),
+        arrowprops=dict(facecolor="#e74c3c", shrink=0.08, width=1.5, headwidth=7, headlength=7),
+        ha="center",
+        fontweight="bold",
+        color="#e74c3c"
+    )
+    
+    ax_mp.set_title("Total Flaring Volume by Possible Window Start Date", fontsize=14, fontweight="bold", pad=15)
+    ax_mp.set_xlabel("Possible Window Start Date", fontsize=12)
+    ax_mp.set_ylabel("Total Volume ($m^3$)", fontsize=12)
+    ax_mp.grid(True, linestyle="--", alpha=0.5)
+    ax_mp.legend(loc="upper right", frameon=True)
+    
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.savefig("possible_starting_dates_flaring.png", dpi=300)
+    
+    print("Opening Matplotlib interface...")
+    plt.show()
+    plt.close()
+
 if __name__ == "__main__":
     xml_path = input("Enter path to MS Project XML file: ").strip().strip("'\"")
     csv_path = input("Enter path to forecasted flaring CSV file: ").strip().strip("'\"")
@@ -159,5 +198,6 @@ if __name__ == "__main__":
         opt_start, opt_finish, max_vol, window_rows, delta_days = find_optimal_shutdown_window(flaring_data, duration)
         generate_visualizations(flaring_data, orig_start, orig_finish, opt_start, opt_finish, window_rows, delta_days)
         print("✓ Interactive application generated successfully at 'shutdown_window_slider.html'.")
+        print("✓ Matplotlib visualization generated successfully at 'possible_starting_dates_flaring.png'.")
     except Exception as e:
         print(f"❌ Execution failed: {str(e)}")
